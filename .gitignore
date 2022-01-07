@@ -1,0 +1,23 @@
+# Vendor & dep-related
+vendor/
+pkg/
+
+# Editor settings
+.glide/
+.idea/
+*.iml
+.vscode/
+
+# logs
+log*/*
+
+# temporary files
+tmp/
+
+# Merge conflict file
+*.orig
+
+# binaries
+__debug_bin
+hdproxy
+*.exe
