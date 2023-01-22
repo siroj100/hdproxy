@@ -21,3 +21,5 @@ tmp/
 __debug_bin
 hdproxy
 *.exe
+
+hdproxy.toml

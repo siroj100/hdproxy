@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -21,29 +18,14 @@ const (
 )
 
 var (
-	port       int
-	target     string
-	hold       time.Duration
-	targetUrl  *url.URL
 	err        error
 	reqTimeMap sync.Map
 	logDirName string
 )
 
 func main() {
-	flag.IntVar(&port, "port", 0, "local port to listen to")
-	flag.StringVar(&target, "target", "", "target URL to proxy to")
-	flag.DurationVar(&hold, "hold", 0, "how long to hold the request")
-	flag.Parse()
-	target = strings.TrimSpace(target)
-	if port == 0 || len(target) == 0 {
-		log.Fatalln("both port & target has to be provided")
-	}
-	targetUrl, err = url.Parse(target)
-	if err != nil {
-		log.Fatalln("invalid target url")
-	}
-
+	proxyConfs := InitConfig()
+	fmt.Printf("proxyConfs: %+v\n", proxyConfs)
 	logDirName = fmt.Sprintf("log-%d", port)
 	if err = os.Mkdir(logDirName, 0700); err != nil && !os.IsExist(err) {
 		log.Fatalln("error create log folder", err)
@@ -103,10 +85,10 @@ func proxyDirector(req *http.Request) {
 	}
 	val := time.Now().UnixNano()
 	reqTimeMap.Store(req, val)
-	req.Host = targetUrl.Host
-	req.URL.Scheme = targetUrl.Scheme
-	req.URL.Host = targetUrl.Host
-	req.URL.Path = targetUrl.Path + req.URL.Path
+	//req.Host = targetUrl.Host
+	//req.URL.Scheme = targetUrl.Scheme
+	//req.URL.Host = targetUrl.Host
+	//req.URL.Path = targetUrl.Path + req.URL.Path
 	f, err := os.Create(fmt.Sprintf("%s/%d-req", logDirName, val))
 	if err != nil {
 		log.Println("error create req log:", err)

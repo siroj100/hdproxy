@@ -1,0 +1,7 @@
+[8080]
+Target="https://google.com"
+Hold="62s"
+
+[8081]
+Target="https://github.com"
+
