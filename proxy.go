@@ -36,8 +36,8 @@ func NewProxy(config ProxyConfig) *Proxy {
 	if err != nil {
 		log.Fatalln("invalid target url")
 	}
-	logDirName := fmt.Sprintf("log-%d", config.Port)
-	if err = os.Mkdir(logDirName, 0700); err != nil && !os.IsExist(err) {
+	logDirName := fmt.Sprintf("log/%d", config.Port)
+	if err = os.MkdirAll(logDirName, 0700); err != nil && !os.IsExist(err) {
 		log.Fatalln("error create log folder", err)
 	}
 	result := &Proxy{
