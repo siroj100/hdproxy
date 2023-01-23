@@ -21,15 +21,15 @@ type (
 	}
 )
 
-var (
-	fname  string
-	port   int
-	target string
-	hold   time.Duration
-)
-
 func InitConfig() map[int]ProxyConfig {
-	var result map[int]ProxyConfig
+	var (
+		fname  string
+		port   int
+		target string
+		hold   time.Duration
+		result map[int]ProxyConfig
+	)
+
 	flag.StringVar(&fname, "config", "", "config file to read")
 	flag.IntVar(&port, "port", 0, "local port to listen to")
 	flag.StringVar(&target, "target", "", "target URL to proxy to")
