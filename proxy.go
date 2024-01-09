@@ -87,7 +87,8 @@ func (p *Proxy) proxyDirector(req *http.Request) {
 		return
 	}
 	val := time.Now().UnixNano()
-	p.reqTimeMap.Store(req, val)
+	key := req.RemoteAddr + " " + req.Method + " " + req.RequestURI
+	p.reqTimeMap.Store(key, val)
 	req.Host = p.targetUrl.Host
 	req.URL.Scheme = p.targetUrl.Scheme
 	req.URL.Host = p.targetUrl.Host
@@ -109,7 +110,9 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 		fmt.Println("error dumping resp", resp.Request.URL)
 		return err
 	}
-	val, found := p.reqTimeMap.Load(resp.Request)
+	req := resp.Request
+	key := req.RemoteAddr + " " + req.Method + " " + req.RequestURI
+	val, found := p.reqTimeMap.Load(key)
 	if !found {
 		log.Println("request time not found")
 		return nil
