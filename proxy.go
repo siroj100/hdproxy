@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -25,6 +26,7 @@ type (
 		targetUrl  *url.URL
 		reqTimeMap sync.Map
 		logDirName string
+		logWriter  io.Writer
 
 		srv          http.Server
 		reverseProxy *httputil.ReverseProxy
@@ -40,12 +42,26 @@ func NewProxy(config ProxyConfig) *Proxy {
 	if err = os.MkdirAll(logDirName, 0700); err != nil && !os.IsExist(err) {
 		log.Fatalln("error create log folder", err)
 	}
+	logFn := fmt.Sprintf("log/%d.log", config.Port)
+	fInfo, err := os.Stat(logFn)
+	if err == nil && fInfo.Size() > 0 {
+		logFnRename := fmt.Sprintf("log/%d-%s.log", config.Port, fInfo.ModTime().Format("20060102150405"))
+		if err = os.Rename(logFn, logFnRename); err != nil {
+			log.Println("Error renaming ", logFn, "to", logFnRename)
+		}
+	}
+	logFile, err := os.Create(logFn)
+	if err != nil {
+		log.Fatalln("Error creating log file", logFn)
+	}
+	logWriter := io.MultiWriter(os.Stdout, logFile)
 	result := &Proxy{
 		port:       config.Port,
 		target:     config.Target,
 		hold:       config.Hold,
 		reqTimeMap: sync.Map{},
 		logDirName: logDirName,
+		logWriter:  logWriter,
 		targetUrl:  targetUrl,
 	}
 	rp := &httputil.ReverseProxy{
@@ -80,7 +96,6 @@ func (p *Proxy) Shutdown(ctx context.Context) {
 }
 
 func (p *Proxy) proxyDirector(req *http.Request) {
-	printReq(os.Stdout, req)
 	reqDump, err := httputil.DumpRequest(req, true)
 	if err != nil {
 		fmt.Println("error dumping req", req.URL)
@@ -110,6 +125,7 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 		fmt.Println("error dumping resp", resp.Request.URL)
 		return err
 	}
+	logResp(p.logWriter, resp, respDump)
 	req := resp.Request
 	key := req.RemoteAddr + " " + req.Method + " " + req.RequestURI
 	val, found := p.reqTimeMap.Load(key)

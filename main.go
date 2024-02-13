@@ -3,17 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 )
 
 func main() {
 	proxies := make(map[int]*Proxy)
 	proxyConfs := InitConfig()
-	fmt.Printf("proxyConfs: %+v\n", proxyConfs)
+	//fmt.Printf("proxyConfs: %+v\n", proxyConfs)
 	for port, conf := range proxyConfs {
 		proxy := NewProxy(conf)
 		go func() {
@@ -21,7 +23,7 @@ func main() {
 				log.Fatalln("Port", port, ":", err)
 			}
 		}()
-		fmt.Println("Ready listening on port", port)
+		fmt.Println(conf.Port, "->", conf.Target, "hold:", conf.Hold)
 		proxies[port] = proxy
 
 	}
@@ -54,5 +56,18 @@ func printResp(f *os.File, r *http.Response) {
 	_, err := fmt.Fprintln(f, r.Request.URL.Scheme, "|", r.Request.Host, "|", r.Request.URL, "|", r.Request.URL.Path, "|", r.Request.URL.RawQuery, "|", r.Header)
 	if err != nil {
 		log.Println("error writing to file:", f, err)
+	}
+}
+
+func logResp(f io.Writer, resp *http.Response, data []byte) {
+	reqDate := time.Now().Format("02/January/2006:15:04:05 -0700")
+	req := resp.Request
+	remoteAddr := strings.Split(req.RemoteAddr, ":")
+	reqHost := req.URL.Scheme + "://" + req.URL.Host
+	format := "%s - - [%s] \"%s %s %s\" %d %d \"%s\" \"%s\"\n"
+	//log.Println("requestURI:", req.RequestURI, req.URL)
+	_, err := fmt.Fprintf(f, format, remoteAddr[0], reqDate, req.Method, req.RequestURI, req.Proto, resp.StatusCode, len(data), reqHost, req.UserAgent())
+	if err != nil {
+		log.Println("error logging:", err)
 	}
 }
