@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,13 +21,12 @@ type (
 	}
 )
 
-func InitConfig() map[int]ProxyConfig {
+func InitConfig() []ProxyConfig {
 	var (
 		fname  string
 		port   int
 		target string
 		hold   time.Duration
-		result map[int]ProxyConfig
 	)
 
 	flag.StringVar(&fname, "config", "", "config file to read")
@@ -41,8 +40,8 @@ func InitConfig() map[int]ProxyConfig {
 		if err != nil {
 			log.Fatalln("invalid target url")
 		}
-		result = make(map[int]ProxyConfig)
-		result[port] = ProxyConfig{
+		result := make([]ProxyConfig, 1)
+		result[0] = ProxyConfig{
 			Port:   port,
 			Target: target,
 			Hold:   hold,
@@ -57,27 +56,34 @@ func InitConfig() map[int]ProxyConfig {
 	if err != nil {
 		log.Fatalln("no port or target provided, and failed to read config file,", err)
 	}
-	result = ReadConfig(fstream)
-	fmt.Printf("%+v\n", result)
+	result := ReadConfig(fstream)
+	//fmt.Printf("%+v\n", result)
 	return result
 }
 
-func ReadConfig(stream io.Reader) map[int]ProxyConfig {
-	var result map[int]ProxyConfig
+func ReadConfig(stream io.Reader) []ProxyConfig {
+	var configs map[int]ProxyConfig
 	viper.SetConfigType("toml")
 	err := viper.ReadConfig(stream)
 	if err != nil {
 		log.Fatalln("can't read config", err)
 	}
-	err = viper.Unmarshal(&result)
+	err = viper.Unmarshal(&configs)
 	if err != nil {
 		log.Fatalln("can't parse config", err)
 	}
-	for k := range result {
-		cfg := result[k]
+	result := make([]ProxyConfig, len(configs))
+	i := 0
+	for k := range configs {
+		cfg := configs[k]
 		cfg.Port = k
-		result[k] = cfg
+		configs[k] = cfg
+		result[i] = cfg
+		i += 1
 		//fmt.Printf("%i: %+v\n", k, cfg)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Port < result[j].Port
+	})
 	return result
 }

@@ -16,15 +16,15 @@ func main() {
 	proxies := make(map[int]*Proxy)
 	proxyConfs := InitConfig()
 	//fmt.Printf("proxyConfs: %+v\n", proxyConfs)
-	for port, conf := range proxyConfs {
+	for _, conf := range proxyConfs {
 		proxy := NewProxy(conf)
 		go func() {
 			if err := proxy.Start(); err != nil {
-				log.Fatalln("Port", port, ":", err)
+				log.Fatalln("Port", conf.Port, ":", err)
 			}
 		}()
 		fmt.Println(conf.Port, "->", conf.Target, "hold:", conf.Hold)
-		proxies[port] = proxy
+		proxies[conf.Port] = proxy
 
 	}
 
