@@ -54,7 +54,7 @@ func NewProxy(config ProxyConfig) *Proxy {
 	if err != nil {
 		log.Fatalln("Error creating log file", logFn)
 	}
-	logWriter := io.MultiWriter(os.Stdout, logFile)
+	logWriter := io.MultiWriter(NewPrefixedWriter(os.Stdout, strconv.Itoa(config.Port)), logFile)
 	result := &Proxy{
 		port:       config.Port,
 		target:     config.Target,
@@ -125,10 +125,10 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 		fmt.Println("error dumping resp", resp.Request.URL)
 		return err
 	}
-	logResp(p.logWriter, resp, respDump)
 	req := resp.Request
 	key := req.RemoteAddr + " " + req.Method + " " + req.RequestURI
 	val, found := p.reqTimeMap.Load(key)
+	logResp(p.logWriter, resp, respDump, val.(int64))
 	if !found {
 		log.Println("request time not found")
 		return nil
@@ -141,4 +141,30 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 	printResp(f, resp)
 	fmt.Fprint(f, string(respDump))
 	return nil
+}
+
+func printReq(f *os.File, r *http.Request) {
+	_, err := fmt.Fprintln(f, r.URL.Scheme, "|", r.Host, "|", r.URL, "|", r.URL.Path, "|", r.URL.RawQuery, "|", r.Header)
+	if err != nil {
+		log.Println("error writing to file:", f, err)
+	}
+}
+
+func printResp(f *os.File, r *http.Response) {
+	_, err := fmt.Fprintln(f, r.Request.URL.Scheme, "|", r.Request.Host, "|", r.Request.URL, "|", r.Request.URL.Path, "|", r.Request.URL.RawQuery, "|", r.Header)
+	if err != nil {
+		log.Println("error writing to file:", f, err)
+	}
+}
+
+func logResp(f io.Writer, resp *http.Response, data []byte, timestamp int64) {
+	reqDate := time.Now().Format("02/January/2006:15:04:05 -0700")
+	req := resp.Request
+	reqHost := req.URL.Scheme + "://" + req.URL.Host
+	format := "%s - - [%s] \"%s %s %s\" %d %d \"%s\" \"%s\" %d\n"
+	//log.Println("requestURI:", req.RequestURI, req.URL)
+	_, err := fmt.Fprintf(f, format, req.RemoteAddr, reqDate, req.Method, req.RequestURI, req.Proto, resp.StatusCode, len(data), reqHost, req.UserAgent(), timestamp)
+	if err != nil {
+		log.Println("error logging:", err)
+	}
 }
