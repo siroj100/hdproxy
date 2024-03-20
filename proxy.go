@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ type (
 		reqTimeMap sync.Map
 		logDirName string
 		logWriter  io.Writer
+		noLog      []*regexp.Regexp
 
 		srv          http.Server
 		reverseProxy *httputil.ReverseProxy
@@ -55,6 +57,15 @@ func NewProxy(config ProxyConfig) *Proxy {
 		log.Fatalln("Error creating log file", logFn)
 	}
 	logWriter := io.MultiWriter(NewPrefixedWriter(os.Stdout, strconv.Itoa(config.Port)), logFile)
+	noLog := make([]*regexp.Regexp, 0)
+	for _, pattern := range config.NoLog {
+		rx, err := regexp.Compile(pattern)
+		if err != nil {
+			log.Println(config.Port, ": Ignoring invalid noLog pattern", pattern, ", error:", err)
+		} else {
+			noLog = append(noLog, rx)
+		}
+	}
 	result := &Proxy{
 		port:       config.Port,
 		target:     config.Target,
@@ -63,6 +74,7 @@ func NewProxy(config ProxyConfig) *Proxy {
 		logDirName: logDirName,
 		logWriter:  logWriter,
 		targetUrl:  targetUrl,
+		noLog:      noLog,
 	}
 	rp := &httputil.ReverseProxy{
 		Director:       result.proxyDirector,
@@ -120,6 +132,11 @@ func (p *Proxy) proxyDirector(req *http.Request) {
 }
 
 func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
+	for _, rx := range p.noLog {
+		if rx.Match([]byte(resp.Request.RequestURI)) {
+			return nil
+		}
+	}
 	respDump, err := httputil.DumpResponse(resp, true)
 	if err != nil {
 		fmt.Println("error dumping resp", resp.Request.URL)

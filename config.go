@@ -18,6 +18,7 @@ type (
 		Port   int
 		Target string
 		Hold   time.Duration
+		NoLog  []string
 	}
 )
 
