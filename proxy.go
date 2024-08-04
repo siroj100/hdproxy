@@ -79,6 +79,7 @@ func NewProxy(config ProxyConfig) *Proxy {
 	rp := &httputil.ReverseProxy{
 		Director:       result.proxyDirector,
 		ModifyResponse: result.proxyModifyResponse,
+		ErrorHandler:   result.proxyErrorHandler,
 	}
 	result.reverseProxy = rp
 	return result
@@ -120,14 +121,24 @@ func (p *Proxy) proxyDirector(req *http.Request) {
 	req.URL.Scheme = p.targetUrl.Scheme
 	req.URL.Host = p.targetUrl.Host
 	req.URL.Path = p.targetUrl.Path + req.URL.Path
-	f, err := os.Create(fmt.Sprintf("%s/%d-req", p.logDirName, val))
-	if err != nil {
-		log.Println("error create req log:", err)
-		return
+
+	noLog := false
+	for _, rx := range p.noLog {
+		if rx.Match([]byte(req.RequestURI)) {
+			noLog = true
+			break
+		}
 	}
-	defer f.Close()
-	printReq(f, req)
-	fmt.Fprintf(f, string(reqDump))
+	if !noLog {
+		f, err := os.Create(fmt.Sprintf("%s/%d-req", p.logDirName, val))
+		if err != nil {
+			log.Println("error create req log:", err)
+			return
+		}
+		defer f.Close()
+		printReq(f, req)
+		fmt.Fprintf(f, string(reqDump))
+	}
 	time.Sleep(p.hold)
 }
 
@@ -158,6 +169,13 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 	printResp(f, resp)
 	fmt.Fprint(f, string(respDump))
 	return nil
+}
+
+func (p *Proxy) proxyErrorHandler(writer http.ResponseWriter, req *http.Request, err error) {
+	format := "%s - - [%s] \"%s %s %s\"\n"
+	reqDate := time.Now().Format("02/January/2006:15:04:05 -0700")
+	f := p.logWriter
+	fmt.Fprintf(f, format, req.RemoteAddr, reqDate, req.Method, req.RequestURI, req.Proto)
 }
 
 func printReq(f *os.File, r *http.Request) {
