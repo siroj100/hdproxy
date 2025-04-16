@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -138,6 +139,10 @@ func (p *Proxy) proxyDirector(req *http.Request) {
 		defer f.Close()
 		printReq(f, req)
 		fmt.Fprintf(f, string(reqDump))
+	}
+	hAcceptEnc := req.Header.Get("Accept-Encoding")
+	if strings.Contains(hAcceptEnc, "gzip") {
+		req.Header.Del("Accept-Encoding")
 	}
 	if p.hold > 0 {
 		time.Sleep(p.hold)
