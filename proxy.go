@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -155,11 +156,18 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 			return nil
 		}
 	}
-	respDump, err := httputil.DumpResponse(resp, true)
+
+	var buf bytes.Buffer
+	body := io.TeeReader(resp.Body, &buf)
+	dumpResp := *resp
+	dumpResp.Body = io.NopCloser(body)
+	respDump, err := httputil.DumpResponse(&dumpResp, true)
 	if err != nil {
 		fmt.Println("error dumping resp", resp.Request.URL)
 		return err
 	}
+	resp.Body = io.NopCloser(&buf)
+
 	req := resp.Request
 	key := req.RemoteAddr + " " + req.Method + " " + req.RequestURI
 	val, found := p.reqTimeMap.Load(key)
