@@ -17,10 +17,6 @@ import (
 	"time"
 )
 
-const (
-	minTimeout = 15 * time.Second
-)
-
 type (
 	Proxy struct {
 		port       int
@@ -92,14 +88,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Proxy) Start() error {
-	writeTimeout := 2 * p.hold
-	if writeTimeout < minTimeout {
-		writeTimeout = minTimeout
-	}
 	p.srv = http.Server{
 		Addr:         ":" + strconv.Itoa(p.port),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: writeTimeout,
+		ReadTimeout:  0, // set to 0 in case client somehow took long time to upload the request
+		WriteTimeout: 0, // this must be bigger than upstream resp time, otherwise client got empty resp, so we set to 0
 		Handler:      p,
 	}
 	return p.srv.ListenAndServe()
