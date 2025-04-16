@@ -139,7 +139,9 @@ func (p *Proxy) proxyDirector(req *http.Request) {
 		printReq(f, req)
 		fmt.Fprintf(f, string(reqDump))
 	}
-	time.Sleep(p.hold)
+	if p.hold > 0 {
+		time.Sleep(p.hold)
+	}
 }
 
 func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
