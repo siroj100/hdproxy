@@ -203,9 +203,9 @@ func logResp(f io.Writer, resp *http.Response, data []byte, timestamp int64) {
 	reqDate := time.Now().Format("02/January/2006:15:04:05 -0700")
 	req := resp.Request
 	reqHost := req.URL.Scheme + "://" + req.URL.Host
-	format := "%s - - [%s] \"%s %s %s\" %d %d \"%s\" \"%s\" %d\n"
+	format := "%s - - [%s] \"%s %s %s\" %d %d \"%s\" %d\n"
 	//log.Println("requestURI:", req.RequestURI, req.URL)
-	_, err := fmt.Fprintf(f, format, req.RemoteAddr, reqDate, req.Method, req.RequestURI, req.Proto, resp.StatusCode, len(data), reqHost, req.UserAgent(), timestamp)
+	_, err := fmt.Fprintf(f, format, req.RemoteAddr, reqDate, req.Method, req.RequestURI, req.Proto, resp.StatusCode, len(data), reqHost, timestamp)
 	if err != nil {
 		log.Println("error logging:", err)
 	}
