@@ -1,3 +1,18 @@
+# first ignore all files
+*
+
+# then add back the ONLY files that we want to commit
+!.gitignore
+!.dockerignore
+!*/
+!*.go
+!go.mod
+!go.sum
+!Dockerfile
+!Makefile
+!*.sample
+!*.md
+
 # Vendor & dep-related
 vendor/
 pkg/
@@ -13,13 +28,3 @@ log*/*
 
 # temporary files
 tmp/
-
-# Merge conflict file
-*.orig
-
-# binaries
-__debug_bin
-hdproxy
-*.exe
-
-hdproxy.toml
