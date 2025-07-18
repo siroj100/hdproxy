@@ -173,6 +173,7 @@ func (p *Proxy) proxyModifyResponse(resp *http.Response) error {
 		log.Println("error create req log:", err)
 		return nil
 	}
+	defer f.Close()
 	printResp(f, resp)
 	fmt.Fprint(f, string(respDump))
 	return nil
