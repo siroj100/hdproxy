@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type (
@@ -84,7 +86,126 @@ func NewProxy(config ProxyConfig) *Proxy {
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if p.isWebSocketRequest(r) {
+		p.handleWebSocket(w, r)
+		return
+	}
 	p.reverseProxy.ServeHTTP(w, r)
+}
+
+func (p *Proxy) isWebSocketRequest(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Connection"), "upgrade") &&
+		strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+}
+
+func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Build upstream URL (ws:// or wss://)
+	targetURL := *p.targetUrl
+	if targetURL.Scheme == "http" {
+		targetURL.Scheme = "ws"
+	} else if targetURL.Scheme == "https" {
+		targetURL.Scheme = "wss"
+	}
+	targetURL.Path = p.targetUrl.Path + r.URL.Path
+	targetURL.RawQuery = r.URL.RawQuery
+
+	// Log the WebSocket connection attempt
+	timestamp := time.Now().UnixNano()
+	key := r.RemoteAddr + " " + r.Method + " " + r.RequestURI
+	p.reqTimeMap.Store(key, timestamp)
+
+	reqDate := time.Now().Format("02/January/2006:15:04:05 -0700")
+	fmt.Fprintf(p.logWriter, "%s - - [%s] \"WS %s %s\" -> %s\n",
+		r.RemoteAddr, reqDate, r.URL.Path, r.Proto, targetURL.String())
+
+	// Prepare dialer for upstream connection
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+
+	// Copy relevant headers (skip WebSocket-specific hop-by-hop headers)
+	requestHeader := http.Header{}
+	for key, values := range r.Header {
+		keyLower := strings.ToLower(key)
+		if keyLower == "upgrade" || keyLower == "connection" ||
+			strings.HasPrefix(keyLower, "sec-websocket") {
+			continue
+		}
+		for _, value := range values {
+			requestHeader.Add(key, value)
+		}
+	}
+
+	// Connect to upstream WebSocket server
+	upstreamConn, resp, err := dialer.Dial(targetURL.String(), requestHeader)
+	if err != nil {
+		errMsg := fmt.Sprintf("WebSocket dial error to %s: %v", targetURL.String(), err)
+		log.Println(errMsg)
+		if resp != nil {
+			http.Error(w, fmt.Sprintf("WebSocket upstream error: %d", resp.StatusCode), resp.StatusCode)
+		} else {
+			http.Error(w, "WebSocket upstream connection failed", http.StatusBadGateway)
+		}
+		return
+	}
+	defer upstreamConn.Close()
+
+	// Upgrade client connection to WebSocket
+	upgrader := websocket.Upgrader{
+		CheckOrigin:     func(r *http.Request) bool { return true },
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
+	}
+
+	clientConn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket client upgrade error: %v", err)
+		return
+	}
+	defer clientConn.Close()
+
+	fmt.Fprintf(p.logWriter, "%s - - [%s] \"WS %s\" CONNECTED\n",
+		r.RemoteAddr, reqDate, r.URL.Path)
+
+	// Bidirectional message copying
+	errChan := make(chan error, 2)
+
+	// Client -> Upstream
+	go func() {
+		for {
+			messageType, message, err := clientConn.ReadMessage()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			if err = upstreamConn.WriteMessage(messageType, message); err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
+
+	// Upstream -> Client
+	go func() {
+		for {
+			messageType, message, err := upstreamConn.ReadMessage()
+			if err != nil {
+				errChan <- err
+				return
+			}
+			if err = clientConn.WriteMessage(messageType, message); err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
+
+	// Wait for either direction to close
+	<-errChan
+
+	closeDate := time.Now().Format("02/January/2006:15:04:05 -0700")
+	fmt.Fprintf(p.logWriter, "%s - - [%s] \"WS %s\" CLOSED\n",
+		r.RemoteAddr, closeDate, r.URL.Path)
 }
 
 func (p *Proxy) Start() error {

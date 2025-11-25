@@ -2,7 +2,12 @@ module github.com/siroj100/hdproxy
 
 go 1.18
 
-require github.com/spf13/viper v1.15.0
+require (
+	github.com/gorilla/websocket v1.5.3
+	github.com/spf13/viper v1.15.0
+	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5
+	golang.org/x/tools v0.1.12
+)
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -15,6 +20,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
